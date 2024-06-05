@@ -9,6 +9,7 @@ import jwt from 'jsonwebtoken';
 // Schema 
 import { Users } from './models/users.js';
 import { Announcements } from './models/announcements.js';
+import { Apartments } from './models/apartments.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -96,7 +97,8 @@ app.post('/announcement', verifyToken, async (req, res) => {
 
 // Apartments
 app.get('/appartments', async(req,res)=>{
-    // const apartments = await Apartments.find(req.query);
+    const apartments = await Apartments.find({});
+    res.send(apartments);
 })
 
 app.listen(PORT, () => {
