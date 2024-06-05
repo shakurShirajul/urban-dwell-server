@@ -3,6 +3,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import 'dotenv/config';
 import { database } from './database/mongodb.js';
+import verifyToken from './middlewares/verifyToken.js';
 import jwt from 'jsonwebtoken';
 
 // Schema 
@@ -60,6 +61,9 @@ app.post('/users', async (req, res) => {
 })
 
 // app.get('/users/role', async)
+// app.get('/users/role', async(req,res)=>{
+//     const role = 
+// })
 
 
 app.listen(PORT, () => {

@@ -13,7 +13,7 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
-    user_status : {
+    user_role : {
         type: String,
         default: "user",
     },
