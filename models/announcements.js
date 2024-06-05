@@ -13,7 +13,7 @@ const announcementSchema = new mongoose.Schema({
         type: Date,
         default: Date.now,
     },
-    announce_author : {
+    announce_author_email : {
         type: String,
         required: true,
     },

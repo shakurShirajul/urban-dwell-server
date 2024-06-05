@@ -8,6 +8,7 @@ import jwt from 'jsonwebtoken';
 
 // Schema 
 import { Users } from './models/users.js';
+import { Announcements } from './models/announcements.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -84,11 +85,19 @@ app.get('/users/role', verifyToken, async (req, res) => {
 })
 
 // Admin Route
-app.post('/announcement', async(req,res)=>{
-    const {title,body} = req.body;
+app.post('/announcement', verifyToken, async (req, res) => {
+    if (req.user.email !== req.query.email) {
+        console.log(req.user.email, " ", req.query.email)
+        return res.status(403).send({ message: 'forbidden access', u: req.user.email, u1: req.query.email })
+    }
+    const response = await Announcements.create(req.body)
+    res.send(response);
 })
 
-
+// Apartments
+app.get('/appartments', async(req,res)=>{
+    // const apartments = await Apartments.find(req.query);
+})
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
