@@ -25,7 +25,7 @@ app.use(cors({
 app.use(cookieParser());
 
 app.get('/', async (req, res) => {
-
+    res.send("Hello World");
 })
 
 // Authentication Related API
@@ -49,6 +49,17 @@ app.post('/logout', async (req, res) => {
 })
 
 // Get New User Info And Add To Database
+app.get('/users', async (req, res) => {
+    const users = await Users.find(req.query);
+    res.send(users);
+})
+
+app.patch('/users/role', async (req, res) => {
+    const { id } = req.query;
+    console.log(id);
+    const response = await Users.updateOne({ _id: id }, { $set: { user_role: 'user'} })
+    res.send(response);
+})
 
 app.post('/users', async (req, res) => {
     console.log(req.body);
