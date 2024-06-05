@@ -54,10 +54,13 @@ app.get('/users', async (req, res) => {
     res.send(users);
 })
 
-app.patch('/users/role', async (req, res) => {
+app.patch('/users/role', verifyToken, async (req, res) => {
+    if (req.user.email !== req.query.email) {
+        return res.status(403).send({ message: 'forbidden access', u: req.user.email, u1: req.query.email })
+    }
     const { id } = req.query;
-    console.log(id);
-    const response = await Users.updateOne({ _id: id }, { $set: { user_role: 'user'} })
+    // console.log(id);
+    const response = await Users.updateOne({ _id: id }, { $set: { user_role: 'user' } })
     res.send(response);
 })
 
@@ -72,17 +75,19 @@ app.post('/users', async (req, res) => {
 })
 
 app.get('/users/role', verifyToken, async (req, res) => {
-    console.log(req.query.email);
-
     if (req.user.email !== req.query.email) {
         return res.status(403).send({ message: 'forbidden access', u: req.user.email, u1: req.query.email })
     }
-
     const email = req.query.email;
     const user = await Users.findOne({ user_email: email }, { user_role: 1 });
-    console.log(user);
     res.status(200).send(user);
 })
+
+// Admin Route
+app.post('/announcement', async(req,res)=>{
+    const {title,body} = req.body;
+})
+
 
 
 app.listen(PORT, () => {
