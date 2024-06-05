@@ -101,6 +101,8 @@ app.get('/appartments', async(req,res)=>{
     res.send(apartments);
 })
 
+// Agrement Route
+
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 })

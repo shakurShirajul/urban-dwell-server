@@ -1,7 +1,11 @@
 import mongoose from "mongoose";
 
-const apartmentSchema = new mongoose.Schema({
-    apartment_image: {
+const agreementSchema = new mongoose.Schema({
+    user_name: {
+        type: String,
+        required: true,
+    },
+    user_email: {
         type: String,
         required: true,
     },
@@ -20,7 +24,11 @@ const apartmentSchema = new mongoose.Schema({
     rent:{
         type: Number,
         required: true,
+    },
+    status: {
+        type: String,
+        default: 'pending'
     }
 })
 
-export const Apartments = mongoose.model("apartments", apartmentSchema)
+export const Agreement = mongoose.model("agreements", agreementSchema)
