@@ -4,6 +4,7 @@ import cookieParser from 'cookie-parser';
 import 'dotenv/config';
 import { database } from './database/mongodb.js';
 import verifyToken from './middlewares/verifyToken.js';
+import verifyAdmin from './middlewares/verifyAdmin.js';
 import jwt from 'jsonwebtoken';
 
 // Schema 
@@ -35,14 +36,7 @@ app.get('/', async (req, res) => {
 app.post('/jwt', async (req, res) => {
     const user = req.body;
     const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
-    res
-        .cookie('token', token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
-        })
-        .send({ success: true, data: token });
-
+    res.send({ token })
 })
 
 app.post('/logout', async (req, res) => {
@@ -51,29 +45,14 @@ app.post('/logout', async (req, res) => {
     res.clearCookie('token', { maxAge: 0, sameSite: 'none', secure: true }).send({ success: true })
 })
 
-// Get New User Info And Add To Database
-app.get('/users', async (req, res) => {
-    const users = await Users.find(req.query);
-    res.send(users);
-})
 
-app.patch('/users/role', verifyToken, async (req, res) => {
-    if (req.user.email !== req.query.email) {
-        return res.status(403).send({ message: 'forbidden access', u: req.user.email, u1: req.query.email })
-    }
-    const { id } = req.query;
-    // console.log(id);
-    const response = await Users.updateOne({ _id: id }, { $set: { user_role: 'user' } })
-    res.send(response);
-})
 
+// Create New User When SignUp 
 app.post('/users', async (req, res) => {
-    console.log(req.body);
     const { email: user_email, name: user_name, image: user_image } = req.body;
     const result = await Users.find({ user_email });
     if (result.length === 0) {
         const data = await Users.create({ user_name, user_email, user_image })
-        console.log(data);
     }
 })
 
@@ -86,14 +65,14 @@ app.get('/users/role', verifyToken, async (req, res) => {
     res.status(200).send(user);
 })
 
-// Admin Route
-app.post('/announcement', verifyToken, async (req, res) => {
+// Announcement Routes Are Here
+app.get('/announcements', verifyToken, async (req, res) => {
     if (req.user.email !== req.query.email) {
         console.log(req.user.email, " ", req.query.email)
         return res.status(403).send({ message: 'forbidden access', u: req.user.email, u1: req.query.email })
     }
-    const response = await Announcements.create(req.body)
-    res.send(response);
+    const data = await Announcements.find({}).sort({ announce_date: -1 });
+    res.status(200).send(data);
 })
 
 // Apartments
@@ -102,7 +81,17 @@ app.get('/apartments', async (req, res) => {
     res.send(apartments);
 })
 
-// Agrement Route
+// Agrement Route to disbale Agreement Button 
+app.get('/agreement', verifyToken, async (req, res) => {
+    if (req.user.email !== req.query.email) {
+        console.log("here");
+        console.log(req.user.email, " ", req.query.email)
+        return res.status(403).send({ message: 'forbidden access', u: req.user.email, u1: req.query.email })
+    }
+    const data = await Agreement.find({ user_email: req.query.email });
+    res.send(data);
+})
+
 app.post('/agreement', verifyToken, async (req, res) => {
     if (req.user.email !== req.query.email) {
         console.log("here");
@@ -113,6 +102,71 @@ app.post('/agreement', verifyToken, async (req, res) => {
     console.log(response);
     res.status(200).send(response);
 })
+
+
+/* ~~~~~~~~ All Admin Routes Start ~~~~~~~~ */
+
+// Agreement Request That Show On Admin Panel Agreement Request
+
+app.get('/agreements/requests', verifyToken, verifyAdmin, async (req, res) => {
+    const data = await Agreement.find({ status: "pending" });
+    res.send(data);
+})
+
+app.patch('/agreements/requests/updates', verifyToken, verifyAdmin, async (req, res) => {
+    const { status, id } = req.query;
+    const agreementResponse = await Agreement.updateOne({ _id: id }, { $set: { status: 'checked' } })
+
+    const data = await Agreement.find({ _id: id })
+
+    if (status === 'accepted') {
+        console.log("here");
+        const usersResponse = await Users.updateOne({ user_email: data[0].user_email }, { $set: { user_role: 'member' } })
+        res.status(200).send(usersResponse);
+    }
+    else if (status === 'rejected') {
+        res.status(200).send(agreementResponse);
+    }
+
+})
+
+app.post('/announcement', verifyToken, verifyAdmin, async (req, res) => {
+    const response = await Announcements.create(req.body)
+    res.send(response);
+})
+
+// Remove member role frome
+app.patch('/users/role', verifyToken, verifyAdmin, async (req, res) => {
+    const { id } = req.body;
+    const response = await Users.updateOne({ _id: id }, { $set: { user_role: 'user' } })
+    res.send(response);
+})
+
+// Get New User Info And Add To Database
+app.get('/users/members', verifyToken, verifyAdmin, async (req, res) => {
+    const users = await Users.find({ user_role: "member" });
+    res.send(users);
+})
+
+/* ~~~~~~~~ All Admin Routes End ~~~~~~~~ */
+
+
+/* ~~~~~~~~ Checking Adming or Member Or Imposter ~~~~~~~~ */
+
+app.get('/users/checking', verifyToken, async (req, res) => {
+    if (req.query.email !== req.user.email) {
+        return res.status(403).send({ message: 'forbidden access' })
+    }
+    const query = { user_email: req.query.email };
+    const user = await Users.find(query);
+    let validation = false;
+    if (user) {
+        validation = user[0]?.user_role === req.query.role;
+    }
+    res.send({ validation });
+})
+
+/* ~~~~~~~~ Checking Adming Or Not ~~~~~~~~ */
 
 
 app.listen(PORT, () => {
