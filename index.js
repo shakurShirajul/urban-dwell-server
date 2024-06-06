@@ -6,12 +6,16 @@ import { database } from './database/mongodb.js';
 import verifyToken from './middlewares/verifyToken.js';
 import verifyAdmin from './middlewares/verifyAdmin.js';
 import jwt from 'jsonwebtoken';
+import Stripe from 'stripe'
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
 
 // Schema 
 import { Users } from './models/users.js';
 import { Announcements } from './models/announcements.js';
 import { Apartments } from './models/apartments.js';
 import { Agreement } from './models/agrements.js';
+import { Coupons } from './models/coupons.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -45,6 +49,48 @@ app.post('/logout', async (req, res) => {
     res.clearCookie('token', { maxAge: 0, sameSite: 'none', secure: true }).send({ success: true })
 })
 
+//////////////////////////////////////////////////
+
+app.get('/users/specific/:email', async (req, res) => {
+
+    const email = req.params.email;
+    const user = await Users.findOne({ user_email: email });
+
+    const userAgreement = await Agreement.findOne({ user_email: email });
+
+    const userDataAgreementInfo = {
+        user_name: user.user_name,
+        user_email: user.user_email,
+        user_image: user.user_image,
+        block_name: userAgreement?.block_name ? userAgreement?.block_name : 'None',
+        floor_no: userAgreement?.floor_no ? userAgreement.floor_no : "None",
+        apartment_no: userAgreement?.apartment_no ? userAgreement.apartment_no : "None",
+        agreement_accept_date: userAgreement?.agreement_accept_date ? userAgreement.agreement_accept_date : "None",
+        rent: userAgreement?.rent,
+    }
+    res.send(userDataAgreementInfo);
+
+})
+
+app.get('/admin/info', verifyToken, verifyAdmin, async (req, res) => {
+    const adminData = await Users.findOne({ user_email: req.query.email, user_role: 'admin' });
+    res.status(200).send(adminData)
+})
+
+// Getting Stats For Admin Profile
+
+app.get('/admin/stats', verifyToken, verifyAdmin, async (req, res) => {
+    const apartments = await Apartments.find({});
+    // const occupiedApartment = await Users.find({user_role: 'member'});
+    // const
+    const stats = {
+        totalApartments: apartments.length,
+    }
+    res.status(200).send(stats);
+});
+
+
+/////////////////////////////////////////////////
 
 
 // Create New User When SignUp 
@@ -115,16 +161,14 @@ app.get('/agreements/requests', verifyToken, verifyAdmin, async (req, res) => {
 
 app.patch('/agreements/requests/updates', verifyToken, verifyAdmin, async (req, res) => {
     const { status, id } = req.query;
-    const agreementResponse = await Agreement.updateOne({ _id: id }, { $set: { status: 'checked' } })
-
-    const data = await Agreement.find({ _id: id })
-
     if (status === 'accepted') {
-        console.log("here");
+        const agreementResponse = await Agreement.updateOne({ _id: id }, { $set: { status: 'checked', agreement_accept_date: Date.now() } })
+        const data = await Agreement.find({ _id: id })
         const usersResponse = await Users.updateOne({ user_email: data[0].user_email }, { $set: { user_role: 'member' } })
         res.status(200).send(usersResponse);
     }
     else if (status === 'rejected') {
+        const agreementResponse = await Agreement.updateOne({ _id: id }, { $set: { status: 'checked' } })
         res.status(200).send(agreementResponse);
     }
 
@@ -148,6 +192,51 @@ app.get('/users/members', verifyToken, verifyAdmin, async (req, res) => {
     res.send(users);
 })
 
+// Make Coupon in stripe and store in database
+
+app.post('/create-coupon', async (req, res) => {
+
+    const { couponCode, couponDiscount, couponDescription } = req.body;
+    console.log("Coupon Is Here")
+    try {
+        const coupon = await stripe.coupons.create({
+            id: couponCode,
+            percent_off: couponDiscount,
+            duration: 'repeating',
+            duration_in_months: 4,
+        });
+        const couponData = await Coupons.create({
+            coupon_Code: couponCode,
+            coupon_Discount: couponDiscount,
+            coupon_Description: couponDescription
+        })
+        console.log(couponData)
+        res.status(200).json({ coupon });
+    } catch (error) {
+        console.log(error.message)
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.delete('/delete-coupon/:couponId', async (req, res) => {
+    try {
+        const couponId = req.params.couponId;
+
+        if (!couponId) {
+            return res.status(400).json({ error: 'Coupon ID is required' });
+        }
+
+        await stripe.coupons.del(couponId);
+
+        const deleteRepsonse = await Coupons.deleteOne({ coupon_Code: couponId })
+
+        res.status(200).json({ message: 'Coupon deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+
 /* ~~~~~~~~ All Admin Routes End ~~~~~~~~ */
 
 
@@ -168,6 +257,25 @@ app.get('/users/checking', verifyToken, async (req, res) => {
 
 /* ~~~~~~~~ Checking Adming Or Not ~~~~~~~~ */
 
+/* ~~~~~~~~ Payment Method ~~~~~~~~ */
+app.post('/create-payment-intent', async (req, res) => {
+    const { price } = req.body;
+    const amount = parseInt(price * 100);
+    const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: 'usd',
+        payment_method_types: ['card'],
+    });
+    res.send({
+        clientSecret: paymentIntent.client_secret,
+    });
+})
+
+/* ```````` Coupon ```````````` */
+app.get('/coupon-code', async (req, res) => {
+    const couponCode = await Coupons.find({});
+    res.send(couponCode);
+})
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);

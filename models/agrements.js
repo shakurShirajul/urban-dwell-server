@@ -29,9 +29,13 @@ const agreementSchema = new mongoose.Schema({
         type: String,
         default: 'pending'
     },
-    agreement_data: {
+    agreement_request_date: {
         type: Date,
         default: Date.now,
+    },
+    agreement_accept_date:{
+        type: Date,
+        default: 0,
     }
 })
 
