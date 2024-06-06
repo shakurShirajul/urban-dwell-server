@@ -28,6 +28,10 @@ const agreementSchema = new mongoose.Schema({
     status: {
         type: String,
         default: 'pending'
+    },
+    agreement_data: {
+        type: Date,
+        default: Date.now,
     }
 })
 

@@ -10,6 +10,7 @@ import jwt from 'jsonwebtoken';
 import { Users } from './models/users.js';
 import { Announcements } from './models/announcements.js';
 import { Apartments } from './models/apartments.js';
+import { Agreement } from './models/agrements.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -96,12 +97,23 @@ app.post('/announcement', verifyToken, async (req, res) => {
 })
 
 // Apartments
-app.get('/appartments', async(req,res)=>{
+app.get('/apartments', async (req, res) => {
     const apartments = await Apartments.find({});
     res.send(apartments);
 })
 
 // Agrement Route
+app.post('/agreement', verifyToken, async (req, res) => {
+    if (req.user.email !== req.query.email) {
+        console.log("here");
+        console.log(req.user.email, " ", req.query.email)
+        return res.status(403).send({ message: 'forbidden access', u: req.user.email, u1: req.query.email })
+    }
+    const response = await Agreement.create(req.body)
+    console.log(response);
+    res.status(200).send(response);
+})
+
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
