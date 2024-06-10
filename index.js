@@ -29,7 +29,7 @@ app.use(express.json());
 app.use(cors({
     origin: [
         'http://localhost:5173',
-        'https://urbandwell.netlify.app/aparments'
+        'https://urbandwell.netlify.app'
     ],
     credentials: true,
 }))
