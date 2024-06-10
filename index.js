@@ -16,6 +16,8 @@ import { Announcements } from './models/announcements.js';
 import { Apartments } from './models/apartments.js';
 import { Agreement } from './models/agrements.js';
 import { Coupons } from './models/coupons.js';
+import { Payments } from './models/payments.js';
+import { ObjectId } from 'mongodb';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -80,11 +82,20 @@ app.get('/admin/info', verifyToken, verifyAdmin, async (req, res) => {
 // Getting Stats For Admin Profile
 
 app.get('/admin/stats', verifyToken, verifyAdmin, async (req, res) => {
+
     const apartments = await Apartments.find({});
-    // const occupiedApartment = await Users.find({user_role: 'member'});
-    // const
+    const users = await Users.find({ user_role: "user" });
+    const members = await Users.find({ user_role: "member" });
+
+    const percentageOfAvailableRoom = (((apartments.length - members.length) / apartments.length) * 100).toFixed(2);
+    const percentageOfUnavailableRoom = (((members.length) / apartments.length) * 100).toFixed(2);
+
     const stats = {
         totalApartments: apartments.length,
+        totalUsers: users.length,
+        totalMembers: members.length,
+        percentageOfAvailableRoom,
+        percentageOfUnavailableRoom
     }
     res.status(200).send(stats);
 });
@@ -123,6 +134,15 @@ app.get('/announcements', verifyToken, async (req, res) => {
 
 // Apartments
 app.get('/apartments', async (req, res) => {
+    const page = parseInt(req.query.page);
+    const limit = parseInt(req.query.limit);
+    const apartments = await Apartments.find({})
+        .skip(page * limit)
+        .limit(limit);
+    res.send(apartments);
+})
+
+app.get('/appartment/length', async (req, res) => {
     const apartments = await Apartments.find({});
     res.send(apartments);
 })
@@ -182,7 +202,11 @@ app.post('/announcement', verifyToken, verifyAdmin, async (req, res) => {
 // Remove member role frome
 app.patch('/users/role', verifyToken, verifyAdmin, async (req, res) => {
     const { id } = req.body;
+
+    const data = await Users.findOne({ _id: id });
     const response = await Users.updateOne({ _id: id }, { $set: { user_role: 'user' } })
+    const deleteAgreement = await Agreement.deleteOne({user_email:data.user_email})
+
     res.send(response);
 })
 
@@ -218,6 +242,7 @@ app.post('/create-coupon', async (req, res) => {
     }
 });
 
+
 app.delete('/delete-coupon/:couponId', async (req, res) => {
     try {
         const couponId = req.params.couponId;
@@ -236,6 +261,57 @@ app.delete('/delete-coupon/:couponId', async (req, res) => {
     }
 });
 
+app.post('/create-payment-intern', async (req, res) => {
+    const { amount, coupon } = req.body;
+    try {
+        let finalAmount = amount * 100;
+        let discountAmount = 0;
+        if (coupon) {
+            const couponDetails = await stripe.coupons.retrieve(coupon);
+            if (couponDetails.valid) {
+                if (couponDetails.percent_off) {
+                    discountAmount = (amount * (couponDetails.percent_off / 100));
+                    finalAmount -= (finalAmount * (couponDetails.percent_off / 100));
+                } else if (couponDetails.amount_off) {
+                    finalAmount -= couponDetails.amount_off;
+                }
+            } else {
+                return res.status(400).json({ error: 'Invalid coupon' });
+            }
+        }
+        const paymentIntent = await stripe.paymentIntents.create({
+            amount: Math.round(finalAmount),
+            currency: 'usd',
+        });
+
+        res.status(200).send({
+            clientSecret: paymentIntent.client_secret,
+            discountAmount
+        });
+    } catch (error) {
+        res.status(400).send({
+            error: {
+                message: error.message,
+            },
+        });
+    }
+})
+
+app.post('/apartment-rent-info', async (req, res) => {
+    console.log(req.body);
+    const response = await Payments.create(req.body);
+    res.status(200).send(response)
+
+})
+
+app.get('/apartment-rent-info', async (req, res) => {
+    const response = await Payments.find({ email: req.query.email });
+    res.send(response);
+})
+app.get('/apartment-rent-info/search', async (req, res) => {
+    const response = await Payments.find({ email: req.query.email, month: req.query.month });
+    res.send(response);
+})
 
 /* ~~~~~~~~ All Admin Routes End ~~~~~~~~ */
 
@@ -257,19 +333,6 @@ app.get('/users/checking', verifyToken, async (req, res) => {
 
 /* ~~~~~~~~ Checking Adming Or Not ~~~~~~~~ */
 
-/* ~~~~~~~~ Payment Method ~~~~~~~~ */
-app.post('/create-payment-intent', async (req, res) => {
-    const { price } = req.body;
-    const amount = parseInt(price * 100);
-    const paymentIntent = await stripe.paymentIntents.create({
-        amount: amount,
-        currency: 'usd',
-        payment_method_types: ['card'],
-    });
-    res.send({
-        clientSecret: paymentIntent.client_secret,
-    });
-})
 
 /* ```````` Coupon ```````````` */
 app.get('/coupon-code', async (req, res) => {
