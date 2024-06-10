@@ -35,7 +35,6 @@ const agreementSchema = new mongoose.Schema({
     },
     agreement_accept_date:{
         type: Date,
-        default: 0,
     }
 })
 
