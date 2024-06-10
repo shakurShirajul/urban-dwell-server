@@ -29,6 +29,7 @@ app.use(express.json());
 app.use(cors({
     origin: [
         'http://localhost:5173',
+        'https://urbandwell.netlify.app/aparments'
     ],
     credentials: true,
 }))
@@ -205,7 +206,7 @@ app.patch('/users/role', verifyToken, verifyAdmin, async (req, res) => {
 
     const data = await Users.findOne({ _id: id });
     const response = await Users.updateOne({ _id: id }, { $set: { user_role: 'user' } })
-    const deleteAgreement = await Agreement.deleteOne({user_email:data.user_email})
+    const deleteAgreement = await Agreement.deleteOne({ user_email: data.user_email })
 
     res.send(response);
 })
