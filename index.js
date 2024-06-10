@@ -185,7 +185,7 @@ app.patch('/agreements/requests/updates', verifyToken, verifyAdmin, async (req, 
     if (status === 'accepted') {
         const agreementResponse = await Agreement.updateOne({ _id: id }, { $set: { status: 'checked', agreement_accept_date: Date.now() } })
         const data = await Agreement.find({ _id: id })
-        const usersResponse = await Users.updateOne({ user_email: data[0].user_email }, { $set: { user_role: 'member' } })
+        const usersResponse = await Users.updateOne({ user_email: data[0].user_email }, { $set: { user_role: 'member', agreement_accept_date: Date.now() } })
         res.status(200).send(usersResponse);
     }
     else if (status === 'rejected') {
